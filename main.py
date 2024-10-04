@@ -1,74 +1,47 @@
+from data_valuation import load_fashion_mnist_data, prepare_buyer_data, prepare_sellers_data, preprocess_images, compute_diversity_and_relevance_for_sellers , compute_eigenvectors_from_covariance , plot_diversity_vs_relevance
 import numpy as np
-import tensorflow as tf
-from sklearn.decomposition import PCA
-import matplotlib.pyplot as plt
+def main():
+    # Load data
+    fmnist_images, fmnist_labels = load_fashion_mnist_data()
 
-# Load CIFAR-10 dataset
-from tensorflow.keras.datasets import cifar10
+    # Prepare Buyer's Data
+    buyer_images, buyer_labels, buyer_indices = prepare_buyer_data(fmnist_images, fmnist_labels)
+    used_indices = buyer_indices.copy()
 
-# Set a random seed for reproducibility
-np.random.seed(42)
+    # Prepare Sellers' Data
+    seller_images_list, seller_labels_list, seller_names, used_indices = prepare_sellers_data(
+        fmnist_images, fmnist_labels, used_indices)
 
+    # Threshold for eigenvalue filtering
+    eigenvalue_threshold = 10**-1
 
-# Load the dataset
-(x_train, y_train), (x_test, y_test) = cifar10.load_data()
+    # Sellers compute their eigenvectors from their covariance matrices
+    seller_eigenvector_list = []
+    seller_eigenvalues_list = []
+    for seller_images in seller_images_list:
+        seller_data = preprocess_images(seller_images)
+        seller_eigenvalues, seller_eigenvectors = compute_eigenvectors_from_covariance(seller_data)
+        
+        # Filter eigenvalues and corresponding eigenvectors where eigenvalue > 10^-2
+        significant_indices = np.where(seller_eigenvalues > eigenvalue_threshold)[0]
+        filtered_eigenvalues = seller_eigenvalues[significant_indices]
+        filtered_eigenvectors = seller_eigenvectors[:, significant_indices]
+        
+        seller_eigenvector_list.append(filtered_eigenvectors)
+        seller_eigenvalues_list.append(filtered_eigenvalues)
 
-# Normalize the images by dividing by 255 (pixel range 0-255)
-x_train = x_train.astype('float32') / 255.0
-x_test = x_test.astype('float32') / 255.0
+    # Compute Diversity and Relevance for Each Seller
+    diversity_vals, relevance_vals = compute_diversity_and_relevance_for_sellers(
+        buyer_images, seller_eigenvector_list, seller_eigenvalues_list)
 
-# Reshape the images into 2D arrays (samples, features)
-x_train = x_train.reshape(x_train.shape[0], -1)
-x_test = x_test.reshape(x_test.shape[0], -1)
+    # Print seller names and their diversity and relevance values
+    for i, txt in enumerate(seller_names):
+        print("Seller name:", txt)
+        print("Relevance:", relevance_vals[i])
+        print("Diversity:", diversity_vals[i])
 
+    # Plot Diversity vs. Relevance
+    plot_diversity_vs_relevance(seller_names, diversity_vals, relevance_vals)
 
-# Let's assume the buyer has a subset of classes 0-4
-buyer_data = x_train[y_train.flatten() <= 4]
-
-# Perform PCA on the buyer's data
-pca = PCA(n_components=10)  # You can adjust the number of components
-buyer_pca = pca.fit(buyer_data)
-
-# Store the principal components and explained variances
-buyer_components = buyer_pca.components_
-buyer_variances = buyer_pca.explained_variance_
-
-# Let's assume the seller has a subset of classes 5-9
-seller_data = x_train[y_train.flatten() >= 5]
-
-# Project the seller's data onto the buyer's principal components
-seller_pca = pca.fit(seller_data)
-
-# Get the seller's explained variances in the directions of the buyer's components
-seller_variances = seller_pca.explained_variance_
-
-
-# Calculate diversity and relevance
-def calculate_diversity_relevance(buyer_variances, seller_variances):
-    # Diversity: difference in variances
-    diversity = np.sqrt(np.prod(np.abs(buyer_variances - seller_variances) / np.maximum(buyer_variances, seller_variances)))
-
-    # Relevance: intersection of variances
-    relevance = np.sqrt(np.prod(np.minimum(buyer_variances, seller_variances) / np.maximum(buyer_variances, seller_variances)))
-
-    return diversity, relevance
-
-# Compute diversity and relevance between buyer's and seller's data
-diversity, relevance = calculate_diversity_relevance(buyer_variances, seller_variances)
-
-print(f"Diversity: {diversity}, Relevance: {relevance}")
-
-
-
-# Visualizing diversity vs. relevance
-def plot_diversity_relevance(diversity, relevance, seller_description):
-    plt.scatter(relevance, diversity, label=seller_description)
-    plt.title("Diversity vs. Relevance")
-    plt.xlabel("Relevance")
-    plt.ylabel("Diversity")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-plot_diversity_relevance(diversity, relevance, "Seller with Classes 5-9")
-
+if __name__ == "__main__":
+    main()

@@ -1,13 +1,16 @@
 import torch
 import numpy as np
-from exponential.utils import find_bingham, convert_eps
+from exponential.util import find_bingham, convert_eps
 from scipy.linalg import null_space
 
 def EMCov(X, args, b_budget=False, b_fleig=True):
-    rho = args.total_budget
-    delta = args.delta
-    n = args.n
-    d = args.d
+    print("args" , args)
+    rho = args['total_budget']
+    delta = args['delta']
+    n = args['n']
+    d = args['d']
+    if isinstance(X, np.ndarray):
+        X = torch.tensor(X, dtype=torch.float32)
     cov = torch.mm(X.t(),X)
     if not(delta > 0.0):
         eps_total = np.sqrt(2*rho)

@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from tensorflow.keras.datasets import fashion_mnist
+from exponential.algos import EMCov
 
 np.random.seed(42)
 
@@ -25,12 +26,20 @@ def get_data(images, labels, classes, exclude_indices=set(), num_samples=10000):
     selected_labels = labels[selected_indices]
     return selected_images, selected_labels, set(selected_indices)
 
-def compute_eigenvectors_from_covariance(data):
+def compute_eigenvectors_from_covariance(data , compute_private = False, args = {'total_budget': 1.0, 'delta': 1e-5, 'n': 10000, 'd': 28 * 28}):
     # Compute the covariance matrix for seller's data
     covariance_matrix = np.cov(data, rowvar=False)
-    # Perform Eigen decomposition
-    eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
-    return eigenvalues, eigenvectors
+    
+    if(compute_private):
+        private_covariance = EMCov(covariance_matrix , args)
+        print("private covariance computed")
+        eigenvalues, eigenvectors = np.linalg.eigh(private_covariance)
+        return eigenvalues, eigenvectors
+        
+    else:
+        # Perform Eigen decomposition
+        eigenvalues, eigenvectors = np.linalg.eigh(covariance_matrix)
+        return eigenvalues, eigenvectors
 
 def compute_variance_in_sellers_direction(buyer_data, seller_eigenvectors):
     # Compute the covariance matrix for the buyer's data
@@ -49,6 +58,9 @@ def compute_diversity_relevance(buyer_eigenvalues, seller_eigenvalues):
     max_vals = np.maximum(buyer_eigenvalues, seller_eigenvalues)
     min_vals = np.minimum(buyer_eigenvalues, seller_eigenvalues)
     abs_diff = np.abs(buyer_eigenvalues - seller_eigenvalues)
+    print("abs diff" , abs_diff)
+    print("max vals" , max_vals)
+    print("min vals" , min_vals)
 
     # Handle division by zero
     with np.errstate(divide='ignore', invalid='ignore'):
@@ -57,7 +69,14 @@ def compute_diversity_relevance(buyer_eigenvalues, seller_eigenvalues):
 
     # Replace NaN values with zero
     valid_mask = ~np.isnan(diversity_components) & ~np.isnan(relevance_components)
+    
+    if len(diversity_components) == 0 or len(relevance_components) == 0:
+        print("Empty components - returning default diversity and relevance")
+        return 1.0, 1.0  # Default neutral values
 
+
+    print("diversity_components" , diversity_components)
+    print("relevance_components" , relevance_components)
     # Apply the mask to filter out rows containing NaN in either array
     diversity_components = diversity_components[valid_mask]
     relevance_components = relevance_components[valid_mask]
@@ -105,33 +124,33 @@ def prepare_sellers_data(fmnist_images, fmnist_labels, used_indices):
 
     # Sellers from fashion-MNIST
     # Seller 6: Sandal (Class 5)
-    seller6_indices = np.where(fmnist_labels == 5)[0]
-    seller6_indices = np.setdiff1d(seller6_indices, list(used_indices))
-    np.random.shuffle(seller6_indices)
-    seller6_images = fmnist_images[seller6_indices[:10000]]
-    seller6_labels = fmnist_labels[seller6_indices[:10000]]
-    used_indices.update(seller6_indices[:10000])
-    seller_images_list.append(seller6_images)
-    seller_labels_list.append(seller6_labels)
-    seller_names.append("Seller 6 (Sandal)")
+    # seller6_indices = np.where(fmnist_labels == 5)[0]
+    # seller6_indices = np.setdiff1d(seller6_indices, list(used_indices))
+    # np.random.shuffle(seller6_indices)
+    # seller6_images = fmnist_images[seller6_indices[:10000]]
+    # seller6_labels = fmnist_labels[seller6_indices[:10000]]
+    # used_indices.update(seller6_indices[:10000])
+    # seller_images_list.append(seller6_images)
+    # seller_labels_list.append(seller6_labels)
+    # seller_names.append("Seller 6 (Sandal)")
 
     # Seller 7: Coat (Class 4)
-    seller7_indices = np.where(fmnist_labels == 4)[0]
-    seller7_indices = np.setdiff1d(seller7_indices, list(used_indices))
-    np.random.shuffle(seller7_indices)
-    seller7_images = fmnist_images[seller7_indices[:10000]]
-    seller7_labels = fmnist_labels[seller7_indices[:10000]]
-    used_indices.update(seller7_indices[:10000])
-    seller_images_list.append(seller7_images)
-    seller_labels_list.append(seller7_labels)
-    seller_names.append("Seller 7 (Coat)")
+    # seller7_indices = np.where(fmnist_labels == 4)[0]
+    # seller7_indices = np.setdiff1d(seller7_indices, list(used_indices))
+    # np.random.shuffle(seller7_indices)
+    # seller7_images = fmnist_images[seller7_indices[:10000]]
+    # seller7_labels = fmnist_labels[seller7_indices[:10000]]
+    # used_indices.update(seller7_indices[:10000])
+    # seller_images_list.append(seller7_images)
+    # seller_labels_list.append(seller7_labels)
+    # seller_names.append("Seller 7 (Coat)")
 
-    # Seller 8: Noisy images
-    seller8_images = np.random.normal(0, 1, (10000, 28, 28))
-    seller8_labels = None  # No labels
-    seller_images_list.append(seller8_images)
-    seller_labels_list.append(seller8_labels)
-    seller_names.append("Seller 8 (Noise)")
+    # # Seller 8: Noisy images
+    # seller8_images = np.random.normal(0, 1, (10000, 28, 28))
+    # seller8_labels = None  # No labels
+    # seller_images_list.append(seller8_images)
+    # seller_labels_list.append(seller8_labels)
+    # seller_names.append("Seller 8 (Noise)")
 
     return seller_images_list, seller_labels_list, seller_names, used_indices
 

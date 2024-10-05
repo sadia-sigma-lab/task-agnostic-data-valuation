@@ -2,6 +2,7 @@ from data_valuation import load_fashion_mnist_data, prepare_buyer_data, prepare_
 import numpy as np
 def main():
     # Load data
+    print("Hold on , Running........")
     fmnist_images, fmnist_labels = load_fashion_mnist_data()
 
     # Prepare Buyer's Data
@@ -20,7 +21,7 @@ def main():
     seller_eigenvalues_list = []
     for seller_images in seller_images_list:
         seller_data = preprocess_images(seller_images)
-        seller_eigenvalues, seller_eigenvectors = compute_eigenvectors_from_covariance(seller_data)
+        seller_eigenvalues, seller_eigenvectors = compute_eigenvectors_from_covariance(seller_data , True , {'total_budget': 2.0, 'delta': 1e-5, 'n': 10000, 'd': 28 * 28})
         
         # Filter eigenvalues and corresponding eigenvectors where eigenvalue > 10^-2
         significant_indices = np.where(seller_eigenvalues > eigenvalue_threshold)[0]
@@ -42,6 +43,7 @@ def main():
 
     # Plot Diversity vs. Relevance
     plot_diversity_vs_relevance(seller_names, diversity_vals, relevance_vals)
+    print("Done ")
 
 if __name__ == "__main__":
     main()

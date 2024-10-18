@@ -1,4 +1,4 @@
-from data_valuation import load_fashion_mnist_data, prepare_buyer_data, prepare_sellers_data, preprocess_images, compute_diversity_and_relevance_for_sellers , compute_eigenvectors_from_covariance , plot_diversity_vs_relevance
+from data_valuation import compute_data_valuation, find_best_seller, load_fashion_mnist_data, plot_valuations, prepare_buyer_data, prepare_sellers_data, preprocess_images, compute_diversity_and_relevance_for_sellers , compute_eigenvectors_from_covariance , plot_diversity_vs_relevance
 import numpy as np
 def main():
     # Load data
@@ -21,7 +21,7 @@ def main():
     seller_eigenvalues_list = []
     for seller_images in seller_images_list:
         seller_data = preprocess_images(seller_images)
-        seller_eigenvalues, seller_eigenvectors = compute_eigenvectors_from_covariance(seller_data , True , {'total_budget': 2.0, 'delta': 1e-5, 'n': 10000, 'd': 28 * 28})
+        seller_eigenvalues, seller_eigenvectors = compute_eigenvectors_from_covariance(seller_data , False ,'eigen_value' , {'total_budget': 9.0, 'delta': 1e-5, 'n': 10000, 'd': 28 * 28})
         
         # Filter eigenvalues and corresponding eigenvectors where eigenvalue > 10^-2
         significant_indices = np.where(seller_eigenvalues > eigenvalue_threshold)[0]
@@ -41,6 +41,18 @@ def main():
         print("Relevance:", relevance_vals[i])
         print("Diversity:", diversity_vals[i])
 
+     # Compute Valuation for Each Seller
+    valuations = []
+    alpha = 0.5  # Example weight for relevance
+    beta = 0.5   # Example weight for diversity
+    for diversity, relevance in zip(diversity_vals, relevance_vals):
+        valuation = compute_data_valuation(diversity, relevance, alpha, beta)
+        valuations.append(valuation)
+    best_seller_idx = find_best_seller(valuations)
+    print(f"Best seller: {seller_names[best_seller_idx]} with valuation: {valuations[best_seller_idx]}")
+
+    # Plot Valuation, Diversity, and Relevance
+    # plot_valuations(valuations, seller_names)
     # Plot Diversity vs. Relevance
     plot_diversity_vs_relevance(seller_names, diversity_vals, relevance_vals)
     print("Done ")
